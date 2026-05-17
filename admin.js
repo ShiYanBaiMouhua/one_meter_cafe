@@ -18,6 +18,9 @@ const homeCalledStatus = document.getElementById("admin-home-called");
 const homeWaitingStatus = document.getElementById("admin-home-waiting");
 const homeCallingStatus = document.getElementById("admin-home-calling");
 const btnCallNext = document.getElementById("btn-call-next");
+const btnReplayAnnouncement = document.getElementById(
+  "btn-replay-announcement"
+);
 const btnClearAll = document.getElementById("btn-clear-all-logs");
 const duplicateWarning = document.getElementById("admin-duplicate-warning");
 const duplicateWarningText = document.getElementById(
@@ -45,6 +48,7 @@ function applyHomeStatsFromCache() {
   const cc = latestCurrentCall || {
     activeLogId: null,
     activeNumber: null,
+    replayTick: 0,
   };
   const activeId = cc.activeLogId || null;
   let called = 0;
@@ -76,6 +80,13 @@ function applyHomeStatsFromCache() {
         : "—";
     homeCallingStatus.textContent = `叫号中：${num}`;
   }
+  if (btnReplayAnnouncement) {
+    const showReplay =
+      Boolean(activeId) &&
+      typeof cc.activeNumber === "string" &&
+      cc.activeNumber.length > 0;
+    btnReplayAnnouncement.hidden = !showReplay;
+  }
 }
 
 /**
@@ -98,6 +109,7 @@ function subscribeHomeStats() {
   if (homeCalledStatus) homeCalledStatus.textContent = "已叫号：…";
   if (homeWaitingStatus) homeWaitingStatus.textContent = "等待中：…";
   if (homeCallingStatus) homeCallingStatus.textContent = "叫号中：…";
+  if (btnReplayAnnouncement) btnReplayAnnouncement.hidden = true;
 
   const db = firebase.firestore();
   unsubLogsStats = db.collection(LOG_COLLECTION).onSnapshot(
@@ -118,7 +130,7 @@ function subscribeHomeStats() {
       (snap) => {
         latestCurrentCall = snap.exists
           ? snap.data()
-          : { activeLogId: null, activeNumber: null };
+          : { activeLogId: null, activeNumber: null, replayTick: 0 };
         applyHomeStatsFromCache();
       },
       (err) => console.error("currentCall 监听失败", err)
@@ -150,7 +162,7 @@ async function callNextNumber() {
 
   if (waitingDocs.length === 0) {
     await metaRef.set(
-      { activeLogId: null, activeNumber: null },
+      { activeLogId: null, activeNumber: null, replayTick: 0 },
       { merge: true }
     );
     window.alert("暂无等待中的记录");
@@ -163,7 +175,28 @@ async function callNextNumber() {
   const pick = waitingDocs[0];
   const num = pick.data().number;
   await metaRef.set(
-    { activeLogId: pick.id, activeNumber: num },
+    { activeLogId: pick.id, activeNumber: num, replayTick: 0 },
+    { merge: true }
+  );
+}
+
+async function replayCurrentCallAnnouncement() {
+  const db = firebase.firestore();
+  const metaRef = db.collection(ADMIN_META_COLLECTION).doc(CURRENT_CALL_DOC);
+  const snap = await metaRef.get();
+  if (!snap.exists) return;
+  const d = snap.data();
+  if (!d.activeLogId || typeof d.activeNumber !== "string" || !d.activeNumber.length) {
+    return;
+  }
+  const cur =
+    typeof d.replayTick === "number" && d.replayTick >= 0 ? d.replayTick : 0;
+  await metaRef.set(
+    {
+      activeLogId: d.activeLogId,
+      activeNumber: d.activeNumber,
+      replayTick: cur + 1,
+    },
     { merge: true }
   );
 }
@@ -383,7 +416,7 @@ async function deleteLogDoc(docId, buttonEl) {
     const mSnap = await metaRef.get();
     if (mSnap.exists && mSnap.data().activeLogId === docId) {
       await metaRef.set(
-        { activeLogId: null, activeNumber: null },
+        { activeLogId: null, activeNumber: null, replayTick: 0 },
         { merge: true }
       );
     }
@@ -457,7 +490,7 @@ if (btnClearAll) {
         .collection(ADMIN_META_COLLECTION)
         .doc(CURRENT_CALL_DOC)
         .set(
-          { activeLogId: null, activeNumber: null },
+          { activeLogId: null, activeNumber: null, replayTick: 0 },
           { merge: true }
         );
       listStatus.textContent = "共 0 条（最多显示 500 条）";
@@ -487,6 +520,21 @@ if (btnCallNext) {
       );
     } finally {
       btnCallNext.disabled = false;
+    }
+  });
+}
+
+if (btnReplayAnnouncement) {
+  btnReplayAnnouncement.addEventListener("click", async () => {
+    if (btnReplayAnnouncement.disabled || btnReplayAnnouncement.hidden) return;
+    btnReplayAnnouncement.disabled = true;
+    try {
+      await replayCurrentCallAnnouncement();
+    } catch (e) {
+      console.error(e);
+      window.alert("再次呼叫失败，请检查网络与 Firestore 规则是否已部署。");
+    } finally {
+      btnReplayAnnouncement.disabled = false;
     }
   });
 }

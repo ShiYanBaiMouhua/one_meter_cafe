@@ -76,6 +76,12 @@
   color: #590f2d;
 }
 
+.admin-btn-replay-announcement {
+  margin: 0.35rem auto 0;
+  max-width: 20rem;
+  width: 100%;
+}
+
 .admin-duplicate-warning {
   margin: 0.75rem auto 0;
   max-width: 20rem;

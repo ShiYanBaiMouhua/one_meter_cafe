@@ -34,13 +34,16 @@ service cloud.firestore {
           || (request.resource.data.message is string
             && request.resource.data.message.size() <= 500));
       allow create, update: if docId == "currentCall"
-        && request.resource.data.keys().hasOnly(["activeLogId", "activeNumber"])
+        && request.resource.data.keys().hasOnly(["activeLogId", "activeNumber", "replayTick"])
         && (request.resource.data.activeLogId == null
           || (request.resource.data.activeLogId is string
             && request.resource.data.activeLogId.size() > 0))
         && (request.resource.data.activeNumber == null
           || (request.resource.data.activeNumber is string
-            && request.resource.data.activeNumber.matches("^[0-9]{3}$")));
+            && request.resource.data.activeNumber.matches("^[0-9]{3}$")))
+        && request.resource.data.replayTick is int
+        && request.resource.data.replayTick >= 0
+        && request.resource.data.replayTick < 1000000;
     }
 
     match /{document=**} {

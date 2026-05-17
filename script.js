@@ -12,7 +12,22 @@ const DUPLICATE_WARNING_TEXT = "有重复号码，请检查记录";
 
 const PROCEED_SOUND_URL = "sound/proceed.mp3";
 
-let lastAnnouncedLogId = null;
+let lastPlaybackKey = null;
+
+function currentCallPlaybackKey(data) {
+  if (
+    !data.activeLogId ||
+    typeof data.activeNumber !== "string" ||
+    !data.activeNumber.length
+  ) {
+    return null;
+  }
+  const tick =
+    typeof data.replayTick === "number" && data.replayTick >= 0
+      ? data.replayTick
+      : 0;
+  return `${data.activeLogId}|${tick}`;
+}
 
 function playOneAudio(url) {
   return new Promise((resolve, reject) => {
@@ -60,19 +75,18 @@ function subscribeCurrentCallAnnouncements() {
     .onSnapshot(
       (snap) => {
         if (!snap.exists) {
-          lastAnnouncedLogId = null;
+          lastPlaybackKey = null;
           return;
         }
         const data = snap.data();
-        const logId = data.activeLogId;
-        const num = data.activeNumber;
-        if (!logId || typeof num !== "string" || num.length === 0) {
-          lastAnnouncedLogId = null;
+        const key = currentCallPlaybackKey(data);
+        if (!key) {
+          lastPlaybackKey = null;
           return;
         }
-        if (logId === lastAnnouncedLogId) return;
-        lastAnnouncedLogId = logId;
-        playCallAnnouncementSequence(num);
+        if (key === lastPlaybackKey) return;
+        lastPlaybackKey = key;
+        playCallAnnouncementSequence(data.activeNumber);
       },
       (err) => console.error("currentCall 叫号监听失败", err)
     );

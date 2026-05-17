@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#590f2d" />
     <title>管理 · 号数记录</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="admin.css?v=10" />
+    <link rel="stylesheet" href="admin.css?v=11" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -60,6 +60,14 @@
               class="admin-home-stat admin-home-stat-calling"
               aria-live="polite"
             ></p>
+            <button
+              type="button"
+              id="btn-replay-announcement"
+              class="btn-primary admin-btn-wide admin-btn-replay-announcement"
+              hidden
+            >
+              再次呼叫
+            </button>
           </header>
           <div class="admin-home-actions">
             <button type="button" id="btn-call-next" class="btn-primary admin-btn-wide">
@@ -105,6 +113,6 @@
     <script>
       firebase.initializeApp(window.FIREBASE_CONFIG);
     </script>
-    <script src="admin.js?v=10" defer></script>
+    <script src="admin.js?v=11" defer></script>
   </body>
 </html>
