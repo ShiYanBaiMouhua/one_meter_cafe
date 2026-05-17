@@ -40,7 +40,7 @@ function formatTime(ms) {
   }
 }
 
-function renderItems(items) {
+function renderItems(items, onDelete) {
   logList.innerHTML = "";
   if (!items.length) {
     const empty = document.createElement("li");
@@ -53,6 +53,9 @@ function renderItems(items) {
     const li = document.createElement("li");
     li.className = "admin-log-row";
 
+    const main = document.createElement("div");
+    main.className = "admin-log-row-main";
+
     const num = document.createElement("p");
     num.className = "admin-log-number";
     num.textContent = row.number ?? "—";
@@ -61,8 +64,18 @@ function renderItems(items) {
     time.className = "admin-log-time";
     time.textContent = formatTime(row.createdAtMs);
 
-    li.appendChild(num);
-    li.appendChild(time);
+    main.appendChild(num);
+    main.appendChild(time);
+
+    const btnDel = document.createElement("button");
+    btnDel.type = "button";
+    btnDel.className = "admin-log-delete";
+    btnDel.textContent = "删除";
+    btnDel.setAttribute("aria-label", `删除号码 ${row.number ?? ""}`);
+    btnDel.addEventListener("click", () => onDelete(row.id, btnDel));
+
+    li.appendChild(main);
+    li.appendChild(btnDel);
     logList.appendChild(li);
   }
 }
@@ -70,7 +83,7 @@ function renderItems(items) {
 function firestoreErrorHint(err) {
   const code = err?.code || "";
   if (code === "permission-denied") {
-    return "无读取权限：请在 Firebase 控制台部署最新的 Firestore 规则（guestNumberLogs 允许 read）。";
+    return "无权限：请在 Firebase 控制台部署最新的 Firestore 规则（guestNumberLogs 允许 read / delete）。";
   }
   if (code === "failed-precondition") {
     return "查询需要索引：请打开浏览器控制台里的 Firebase 链接一键创建索引后重试。";
@@ -82,35 +95,56 @@ function firestoreErrorHint(err) {
   return msg ? `加载失败：${msg}` : "加载失败，请重试";
 }
 
-async function loadLogs() {
-  listStatus.textContent = "加载中…";
-  renderItems([]);
+async function fetchLogItems() {
+  const db = firebase.firestore();
+  const snap = await db
+    .collection(LOG_COLLECTION)
+    .orderBy("createdAt", "desc")
+    .limit(500)
+    .get();
+
+  return snap.docs.map((d) => {
+    const data = d.data();
+    const ts = data.createdAt;
+    const createdAtMs =
+      ts && typeof ts.toMillis === "function" ? ts.toMillis() : null;
+    return {
+      id: d.id,
+      number: data.number,
+      createdAtMs,
+    };
+  });
+}
+
+async function deleteLogDoc(docId, buttonEl) {
+  const prev = buttonEl.textContent;
+  buttonEl.disabled = true;
+  buttonEl.textContent = "…";
   try {
     const db = firebase.firestore();
-    const snap = await db
-      .collection(LOG_COLLECTION)
-      .orderBy("createdAt", "desc")
-      .limit(500)
-      .get();
-
-    const items = snap.docs.map((d) => {
-      const data = d.data();
-      const ts = data.createdAt;
-      const createdAtMs =
-        ts && typeof ts.toMillis === "function" ? ts.toMillis() : null;
-      return {
-        id: d.id,
-        number: data.number,
-        createdAtMs,
-      };
-    });
-
+    await db.collection(LOG_COLLECTION).doc(docId).delete();
+    const items = await fetchLogItems();
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
-    renderItems(items);
+    renderItems(items, deleteLogDoc);
   } catch (err) {
     console.error(err);
     listStatus.textContent = firestoreErrorHint(err);
-    renderItems([]);
+    buttonEl.disabled = false;
+    buttonEl.textContent = prev;
+  }
+}
+
+async function loadLogs() {
+  listStatus.textContent = "加载中…";
+  renderItems([], deleteLogDoc);
+  try {
+    const items = await fetchLogItems();
+    listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
+    renderItems(items, deleteLogDoc);
+  } catch (err) {
+    console.error(err);
+    listStatus.textContent = firestoreErrorHint(err);
+    renderItems([], deleteLogDoc);
   }
 }
 

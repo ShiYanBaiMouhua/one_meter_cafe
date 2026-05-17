@@ -4,15 +4,15 @@ service cloud.firestore {
   match /databases/{database}/documents {
     /**
      * 顾客前台：浏览器创建一条记录（号码 + 服务端时间戳）。
-     * 管理页：读取列表。
-     * 禁止修改/删除历史记录（客户端）。
+     * 管理页：读取列表；客户端删除单条（与 read 同为公开，生产环境建议加鉴权）。
      */
     match /guestNumberLogs/{docId} {
       allow read: if true;
       allow create: if request.resource.data.keys().hasOnly(["number", "createdAt"])
         && request.resource.data.number is string
         && request.resource.data.number.matches("^[0-9]{3}$");
-      allow update, delete: if false;
+      allow delete: if true;
+      allow update: if false;
     }
 
     match /{document=**} {
