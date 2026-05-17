@@ -22,37 +22,37 @@ const btnDismissDuplicate = document.getElementById(
   "btn-dismiss-duplicate-warning"
 );
 
+/** 第一页「已登入」实时监听取消函数 */
+let unsubscribeHomeLogCount = null;
+
 function showHome() {
   screenList.hidden = true;
   screenList.setAttribute("aria-hidden", "true");
   screenHome.hidden = false;
   screenHome.removeAttribute("aria-hidden");
-  void refreshHomeLoginStatus();
 }
 
-async function fetchLogCount() {
-  const db = firebase.firestore();
-  const coll = db.collection(LOG_COLLECTION);
-  try {
-    const aggSnap = await coll.count().get();
-    return aggSnap.data().count;
-  } catch (err) {
-    console.warn("count() 不可用，回退为全量计数", err);
-    const snap = await coll.get();
-    return snap.size;
+/**
+ * 监听 guestNumberLogs，实时更新首页「已登入 X/162」
+ * （整表快照；记录量很大时若卡顿可再改成仅 count 轮询）
+ */
+function subscribeHomeLoginCount() {
+  if (!homeLoginStatus || typeof firebase === "undefined") return;
+  if (unsubscribeHomeLogCount) {
+    unsubscribeHomeLogCount();
+    unsubscribeHomeLogCount = null;
   }
-}
-
-async function refreshHomeLoginStatus() {
-  if (!homeLoginStatus) return;
   homeLoginStatus.textContent = "加载中…";
-  try {
-    const n = await fetchLogCount();
-    homeLoginStatus.textContent = `已登入${n}/${GUEST_CAPACITY}`;
-  } catch (err) {
-    console.error(err);
-    homeLoginStatus.textContent = `已登入—/${GUEST_CAPACITY}`;
-  }
+  const db = firebase.firestore();
+  unsubscribeHomeLogCount = db.collection(LOG_COLLECTION).onSnapshot(
+    (snap) => {
+      homeLoginStatus.textContent = `已登入${snap.size}/${GUEST_CAPACITY}`;
+    },
+    (err) => {
+      console.error("guestNumberLogs 实时计数失败", err);
+      homeLoginStatus.textContent = `已登入—/${GUEST_CAPACITY}`;
+    }
+  );
 }
 
 function updateDuplicateBannerUI(data) {
@@ -239,7 +239,6 @@ async function deleteLogDoc(docId, buttonEl) {
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
     setClearAllEnabled(items.length, false);
     renderItems(items, deleteLogDoc);
-    void refreshHomeLoginStatus();
   } catch (err) {
     console.error(err);
     listStatus.textContent = firestoreErrorHint(err);
@@ -257,7 +256,6 @@ async function loadLogs() {
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
     setClearAllEnabled(items.length, false);
     renderItems(items, deleteLogDoc);
-    void refreshHomeLoginStatus();
   } catch (err) {
     console.error(err);
     listStatus.textContent = firestoreErrorHint(err);
@@ -286,7 +284,6 @@ if (btnClearAll) {
       listStatus.textContent = "共 0 条（最多显示 500 条）";
       setClearAllEnabled(0, false);
       renderItems([], deleteLogDoc);
-      void refreshHomeLoginStatus();
     } catch (err) {
       console.error(err);
       listStatus.textContent = firestoreErrorHint(err);
@@ -307,5 +304,5 @@ btnBack.addEventListener("click", () => {
   showHome();
 });
 
-void refreshHomeLoginStatus();
+subscribeHomeLoginCount();
 subscribeDuplicateBanner();

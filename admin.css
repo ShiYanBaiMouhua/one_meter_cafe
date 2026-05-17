@@ -74,6 +74,12 @@
   align-items: stretch;
 }
 
+.admin-duplicate-warning-global {
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+  max-width: none;
+}
+
 .admin-duplicate-warning[hidden] {
   display: none !important;
 }

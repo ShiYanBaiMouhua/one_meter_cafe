@@ -15,30 +15,34 @@ function recordGuestNumberSilent(numberStr) {
   const logs = db.collection(LOG_COLLECTION);
 
   logs
-    .where("number", "==", numberStr)
-    .limit(1)
-    .get()
-    .then((prior) => {
-      return logs.add({
-        number: numberStr,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      }).then(() => {
-        if (!prior.empty) {
-          return db
-            .collection(ADMIN_META)
-            .doc(DUPLICATE_BANNER_ID)
-            .set(
-              {
-                visible: true,
-                message: DUPLICATE_WARNING_TEXT,
-              },
-              { merge: true }
-            );
-        }
-      });
+    .add({
+      number: numberStr,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+    .then(() =>
+      logs.where("number", "==", numberStr).limit(2).get()
+    )
+    .then((sameSnap) => {
+      if (sameSnap.size < 2) return;
+      return db
+        .collection(ADMIN_META)
+        .doc(DUPLICATE_BANNER_ID)
+        .set(
+          {
+            visible: true,
+            message: DUPLICATE_WARNING_TEXT,
+          },
+          { merge: true }
+        )
+        .catch((err) => {
+          console.error(
+            "duplicateBanner 未写入：请在 Firebase 部署包含 adminMeta 的规则，并查看控制台。",
+            err
+          );
+        });
     })
     .catch((err) => {
-      console.warn("guestNumberLogs / duplicate check failed", err);
+      console.warn("guestNumberLogs 写入或重复检测失败", err);
     });
 }
 
