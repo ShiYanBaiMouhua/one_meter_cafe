@@ -111,25 +111,26 @@
 
 .admin-log-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
   padding: 0.85rem 1rem;
   border-radius: 0.85rem;
   background: #ffffff;
   box-shadow: 0 2px 12px rgba(89, 15, 45, 0.06);
 }
 
-.admin-log-row-main {
+.admin-log-row-top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-  flex: 1;
   min-width: 0;
 }
 
 .admin-log-number {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-family: "DIN Next LT Pro", ui-monospace, monospace;
   font-size: 1.65rem;
@@ -146,17 +147,19 @@
 }
 
 .admin-log-delete {
+  align-self: flex-end;
   flex-shrink: 0;
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   letter-spacing: -0.02em;
-  padding: 0.4rem 0.65rem;
+  padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  border: 1px solid rgba(89, 15, 45, 0.22);
-  background: rgba(89, 15, 45, 0.04);
+  border: 1px solid rgba(89, 15, 45, 0.28);
+  background: rgba(89, 15, 45, 0.06);
   color: #590f2d;
   cursor: pointer;
-  min-height: 36px;
+  min-height: 40px;
+  min-width: 4.25rem;
 }
 
 .admin-log-delete:hover:not(:disabled) {

@@ -53,8 +53,8 @@ function renderItems(items, onDelete) {
     const li = document.createElement("li");
     li.className = "admin-log-row";
 
-    const main = document.createElement("div");
-    main.className = "admin-log-row-main";
+    const top = document.createElement("div");
+    top.className = "admin-log-row-top";
 
     const num = document.createElement("p");
     num.className = "admin-log-number";
@@ -64,8 +64,8 @@ function renderItems(items, onDelete) {
     time.className = "admin-log-time";
     time.textContent = formatTime(row.createdAtMs);
 
-    main.appendChild(num);
-    main.appendChild(time);
+    top.appendChild(num);
+    top.appendChild(time);
 
     const btnDel = document.createElement("button");
     btnDel.type = "button";
@@ -74,7 +74,7 @@ function renderItems(items, onDelete) {
     btnDel.setAttribute("aria-label", `删除号码 ${row.number ?? ""}`);
     btnDel.addEventListener("click", () => onDelete(row.id, btnDel));
 
-    li.appendChild(main);
+    li.appendChild(top);
     li.appendChild(btnDel);
     logList.appendChild(li);
   }
