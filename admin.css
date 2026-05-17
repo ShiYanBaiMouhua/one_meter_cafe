@@ -61,6 +61,21 @@
   color: #590f2d;
 }
 
+.admin-home-stat {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: rgba(89, 15, 45, 0.86);
+}
+
+.admin-home-stat-calling {
+  margin-top: 0.45rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #590f2d;
+}
+
 .admin-duplicate-warning {
   margin: 0.75rem auto 0;
   max-width: 20rem;
@@ -111,6 +126,9 @@
 
 .admin-home-actions {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
   justify-content: center;
   padding: 0.5rem 0 0.25rem;
 }
@@ -204,6 +222,56 @@
   box-shadow: 0 2px 12px rgba(89, 15, 45, 0.06);
 }
 
+.admin-log-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.admin-log-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.admin-log-badge-wait {
+  background: rgba(89, 15, 45, 0.08);
+  color: rgba(89, 15, 45, 0.75);
+}
+
+.admin-log-badge-done {
+  background: rgba(46, 125, 50, 0.14);
+  color: #1b5e20;
+}
+
+.admin-log-requeue {
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: -0.02em;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(25, 118, 210, 0.45);
+  background: rgba(25, 118, 210, 0.08);
+  color: #1565c0;
+  cursor: pointer;
+  min-height: 38px;
+}
+
+.admin-log-requeue:hover:not(:disabled) {
+  background: rgba(25, 118, 210, 0.16);
+}
+
+.admin-log-requeue:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .admin-log-row-top {
   display: flex;
   align-items: baseline;
@@ -231,7 +299,7 @@
 }
 
 .admin-log-delete {
-  align-self: flex-end;
+  align-self: auto;
   flex-shrink: 0;
   font-family: inherit;
   font-size: 0.88rem;

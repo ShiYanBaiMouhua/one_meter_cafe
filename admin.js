@@ -2,6 +2,7 @@ const TZ = "Asia/Shanghai";
 const LOG_COLLECTION = "guestNumberLogs";
 const ADMIN_META_COLLECTION = "adminMeta";
 const DUPLICATE_BANNER_DOC = "duplicateBanner";
+const CURRENT_CALL_DOC = "currentCall";
 const DUPLICATE_WARNING_DEFAULT = "有重复号码，请检查记录";
 /** 与前台可输入范围上限一致（script.js MAX_GUEST_NUMBER） */
 const GUEST_CAPACITY = 162;
@@ -13,6 +14,10 @@ const btnBack = document.getElementById("btn-admin-back");
 const listStatus = document.getElementById("admin-list-status");
 const logList = document.getElementById("admin-log-list");
 const homeLoginStatus = document.getElementById("admin-home-login-status");
+const homeCalledStatus = document.getElementById("admin-home-called");
+const homeWaitingStatus = document.getElementById("admin-home-waiting");
+const homeCallingStatus = document.getElementById("admin-home-calling");
+const btnCallNext = document.getElementById("btn-call-next");
 const btnClearAll = document.getElementById("btn-clear-all-logs");
 const duplicateWarning = document.getElementById("admin-duplicate-warning");
 const duplicateWarningText = document.getElementById(
@@ -22,8 +27,11 @@ const btnDismissDuplicate = document.getElementById(
   "btn-dismiss-duplicate-warning"
 );
 
-/** 第一页「已登入」实时监听取消函数 */
-let unsubscribeHomeLogCount = null;
+/** 首页统计：日志快照 + currentCall 快照 */
+let latestLogSnap = null;
+let latestCurrentCall = null;
+let unsubLogsStats = null;
+let unsubCurrentCall = null;
 
 function showHome() {
   screenList.hidden = true;
@@ -32,26 +40,131 @@ function showHome() {
   screenHome.removeAttribute("aria-hidden");
 }
 
-/**
- * 监听 guestNumberLogs，实时更新首页「已登入 X/162」
- * （整表快照；记录量很大时若卡顿可再改成仅 count 轮询）
- */
-function subscribeHomeLoginCount() {
-  if (!homeLoginStatus || typeof firebase === "undefined") return;
-  if (unsubscribeHomeLogCount) {
-    unsubscribeHomeLogCount();
-    unsubscribeHomeLogCount = null;
+function applyHomeStatsFromCache() {
+  if (!latestLogSnap || !homeLoginStatus) return;
+  const cc = latestCurrentCall || {
+    activeLogId: null,
+    activeNumber: null,
+  };
+  const activeId = cc.activeLogId || null;
+  let called = 0;
+  let waiting = 0;
+  latestLogSnap.forEach((doc) => {
+    const d = doc.data();
+    if (d.done === true) {
+      called += 1;
+      return;
+    }
+    if (activeId && doc.id === activeId) {
+      return;
+    }
+    waiting += 1;
+  });
+  homeLoginStatus.textContent = `已登入${latestLogSnap.size}/${GUEST_CAPACITY}`;
+  if (homeCalledStatus) {
+    homeCalledStatus.textContent = `已叫号：${called}`;
   }
-  homeLoginStatus.textContent = "加载中…";
+  if (homeWaitingStatus) {
+    homeWaitingStatus.textContent = `等待中：${waiting}`;
+  }
+  if (homeCallingStatus) {
+    const num =
+      activeId &&
+      typeof cc.activeNumber === "string" &&
+      cc.activeNumber.length > 0
+        ? cc.activeNumber
+        : "—";
+    homeCallingStatus.textContent = `叫号中：${num}`;
+  }
+}
+
+/**
+ * 实时：集合快照 + currentCall，更新已登入 / 已叫号 / 等待中 / 叫号中
+ */
+function subscribeHomeStats() {
+  if (typeof firebase === "undefined") return;
+  if (unsubLogsStats) {
+    unsubLogsStats();
+    unsubLogsStats = null;
+  }
+  if (unsubCurrentCall) {
+    unsubCurrentCall();
+    unsubCurrentCall = null;
+  }
+  latestLogSnap = null;
+  latestCurrentCall = null;
+
+  if (homeLoginStatus) homeLoginStatus.textContent = "加载中…";
+  if (homeCalledStatus) homeCalledStatus.textContent = "已叫号：…";
+  if (homeWaitingStatus) homeWaitingStatus.textContent = "等待中：…";
+  if (homeCallingStatus) homeCallingStatus.textContent = "叫号中：…";
+
   const db = firebase.firestore();
-  unsubscribeHomeLogCount = db.collection(LOG_COLLECTION).onSnapshot(
+  unsubLogsStats = db.collection(LOG_COLLECTION).onSnapshot(
     (snap) => {
-      homeLoginStatus.textContent = `已登入${snap.size}/${GUEST_CAPACITY}`;
+      latestLogSnap = snap;
+      applyHomeStatsFromCache();
     },
     (err) => {
-      console.error("guestNumberLogs 实时计数失败", err);
-      homeLoginStatus.textContent = `已登入—/${GUEST_CAPACITY}`;
+      console.error("guestNumberLogs 监听失败", err);
+      if (homeLoginStatus) homeLoginStatus.textContent = `已登入—/${GUEST_CAPACITY}`;
     }
+  );
+
+  unsubCurrentCall = db
+    .collection(ADMIN_META_COLLECTION)
+    .doc(CURRENT_CALL_DOC)
+    .onSnapshot(
+      (snap) => {
+        latestCurrentCall = snap.exists
+          ? snap.data()
+          : { activeLogId: null, activeNumber: null };
+        applyHomeStatsFromCache();
+      },
+      (err) => console.error("currentCall 监听失败", err)
+    );
+}
+
+function createdAtMillisFromDoc(doc) {
+  const ts = doc.data().createdAt;
+  if (ts && typeof ts.toMillis === "function") return ts.toMillis();
+  return 0;
+}
+
+async function callNextNumber() {
+  const db = firebase.firestore();
+  const metaRef = db.collection(ADMIN_META_COLLECTION).doc(CURRENT_CALL_DOC);
+  const metaSnap = await metaRef.get();
+  const prevId = metaSnap.exists ? metaSnap.data().activeLogId : null;
+
+  if (prevId) {
+    const prevRef = db.collection(LOG_COLLECTION).doc(prevId);
+    const prevDoc = await prevRef.get();
+    if (prevDoc.exists && prevDoc.data().done !== true) {
+      await prevRef.update({ done: true });
+    }
+  }
+
+  const logsSnap = await db.collection(LOG_COLLECTION).get();
+  const waitingDocs = logsSnap.docs.filter((doc) => doc.data().done !== true);
+
+  if (waitingDocs.length === 0) {
+    await metaRef.set(
+      { activeLogId: null, activeNumber: null },
+      { merge: true }
+    );
+    window.alert("暂无等待中的记录");
+    return;
+  }
+
+  waitingDocs.sort(
+    (a, b) => createdAtMillisFromDoc(a) - createdAtMillisFromDoc(b)
+  );
+  const pick = waitingDocs[0];
+  const num = pick.data().number;
+  await metaRef.set(
+    { activeLogId: pick.id, activeNumber: num },
+    { merge: true }
   );
 }
 
@@ -152,7 +265,7 @@ function formatTime(ms) {
   }
 }
 
-function renderItems(items, onDelete) {
+function renderItems(items, onDelete, onRequeue) {
   logList.innerHTML = "";
   if (!items.length) {
     const empty = document.createElement("li");
@@ -179,6 +292,30 @@ function renderItems(items, onDelete) {
     top.appendChild(num);
     top.appendChild(time);
 
+    const actions = document.createElement("div");
+    actions.className = "admin-log-row-actions";
+
+    const badge = document.createElement("span");
+    badge.className = row.done
+      ? "admin-log-badge admin-log-badge-done"
+      : "admin-log-badge admin-log-badge-wait";
+    badge.textContent = row.done ? "已叫号" : "等待中";
+
+    const btnRequeue = document.createElement("button");
+    btnRequeue.type = "button";
+    btnRequeue.className = "admin-log-requeue";
+    btnRequeue.textContent = "回到队列";
+    btnRequeue.disabled = !row.done;
+    btnRequeue.setAttribute(
+      "aria-label",
+      row.done
+        ? `将号码 ${row.number ?? ""} 放回等待队列`
+        : "仅已叫号记录可回到队列"
+    );
+    if (row.done) {
+      btnRequeue.addEventListener("click", () => onRequeue(row.id, btnRequeue));
+    }
+
     const btnDel = document.createElement("button");
     btnDel.type = "button";
     btnDel.className = "admin-log-delete";
@@ -186,8 +323,12 @@ function renderItems(items, onDelete) {
     btnDel.setAttribute("aria-label", `删除号码 ${row.number ?? ""}`);
     btnDel.addEventListener("click", () => onDelete(row.id, btnDel));
 
+    actions.appendChild(badge);
+    actions.appendChild(btnRequeue);
+    actions.appendChild(btnDel);
+
     li.appendChild(top);
-    li.appendChild(btnDel);
+    li.appendChild(actions);
     logList.appendChild(li);
   }
 }
@@ -224,6 +365,7 @@ async function fetchLogItems() {
       id: d.id,
       number: data.number,
       createdAtMs,
+      done: data.done === true,
     };
   });
 }
@@ -235,10 +377,39 @@ async function deleteLogDoc(docId, buttonEl) {
   try {
     const db = firebase.firestore();
     await db.collection(LOG_COLLECTION).doc(docId).delete();
+    const metaRef = db
+      .collection(ADMIN_META_COLLECTION)
+      .doc(CURRENT_CALL_DOC);
+    const mSnap = await metaRef.get();
+    if (mSnap.exists && mSnap.data().activeLogId === docId) {
+      await metaRef.set(
+        { activeLogId: null, activeNumber: null },
+        { merge: true }
+      );
+    }
     const items = await fetchLogItems();
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
     setClearAllEnabled(items.length, false);
-    renderItems(items, deleteLogDoc);
+    renderItems(items, deleteLogDoc, requeueLogDoc);
+  } catch (err) {
+    console.error(err);
+    listStatus.textContent = firestoreErrorHint(err);
+    buttonEl.disabled = false;
+    buttonEl.textContent = prev;
+  }
+}
+
+async function requeueLogDoc(docId, buttonEl) {
+  const prev = buttonEl.textContent;
+  buttonEl.disabled = true;
+  buttonEl.textContent = "…";
+  try {
+    const db = firebase.firestore();
+    await db.collection(LOG_COLLECTION).doc(docId).update({ done: false });
+    const items = await fetchLogItems();
+    listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
+    setClearAllEnabled(items.length, false);
+    renderItems(items, deleteLogDoc, requeueLogDoc);
   } catch (err) {
     console.error(err);
     listStatus.textContent = firestoreErrorHint(err);
@@ -250,17 +421,17 @@ async function deleteLogDoc(docId, buttonEl) {
 async function loadLogs() {
   listStatus.textContent = "加载中…";
   setClearAllEnabled(0, true);
-  renderItems([], deleteLogDoc);
+  renderItems([], deleteLogDoc, requeueLogDoc);
   try {
     const items = await fetchLogItems();
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
     setClearAllEnabled(items.length, false);
-    renderItems(items, deleteLogDoc);
+    renderItems(items, deleteLogDoc, requeueLogDoc);
   } catch (err) {
     console.error(err);
     listStatus.textContent = firestoreErrorHint(err);
     setClearAllEnabled(0, false);
-    renderItems([], deleteLogDoc);
+    renderItems([], deleteLogDoc, requeueLogDoc);
   }
 }
 
@@ -281,9 +452,17 @@ if (btnClearAll) {
         .collection(ADMIN_META_COLLECTION)
         .doc(DUPLICATE_BANNER_DOC)
         .set({ visible: false }, { merge: true });
+      await firebase
+        .firestore()
+        .collection(ADMIN_META_COLLECTION)
+        .doc(CURRENT_CALL_DOC)
+        .set(
+          { activeLogId: null, activeNumber: null },
+          { merge: true }
+        );
       listStatus.textContent = "共 0 条（最多显示 500 条）";
       setClearAllEnabled(0, false);
-      renderItems([], deleteLogDoc);
+      renderItems([], deleteLogDoc, requeueLogDoc);
     } catch (err) {
       console.error(err);
       listStatus.textContent = firestoreErrorHint(err);
@@ -291,6 +470,23 @@ if (btnClearAll) {
     } finally {
       btnClearAll.textContent = prevLabel;
       if (btnBack) btnBack.disabled = false;
+    }
+  });
+}
+
+if (btnCallNext) {
+  btnCallNext.addEventListener("click", async () => {
+    if (btnCallNext.disabled) return;
+    btnCallNext.disabled = true;
+    try {
+      await callNextNumber();
+    } catch (e) {
+      console.error(e);
+      window.alert(
+        "叫号失败：请检查网络，并确认已部署包含 done 字段与 currentCall 的 Firestore 规则。"
+      );
+    } finally {
+      btnCallNext.disabled = false;
     }
   });
 }
@@ -304,5 +500,5 @@ btnBack.addEventListener("click", () => {
   showHome();
 });
 
-subscribeHomeLoginCount();
+subscribeHomeStats();
 subscribeDuplicateBanner();

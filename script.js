@@ -18,6 +18,7 @@ function recordGuestNumberSilent(numberStr) {
     .add({
       number: numberStr,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      done: false,
     })
     .then(() =>
       logs.where("number", "==", numberStr).limit(2).get()

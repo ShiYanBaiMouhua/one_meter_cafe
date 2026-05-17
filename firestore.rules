@@ -3,20 +3,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     /**
-     * 顾客前台：浏览器创建一条记录（号码 + 服务端时间戳）。
-     * 管理页：读取列表；客户端删除单条（与 read 同为公开，生产环境建议加鉴权）。
+     * 顾客前台：创建登记（number + createdAt + done:false）。
+     * 管理页：将 done 改为 true 表示该条已叫号结束。
      */
     match /guestNumberLogs/{docId} {
       allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(["number", "createdAt"])
+      allow create: if request.resource.data.keys().hasOnly(["number", "createdAt", "done"])
         && request.resource.data.number is string
-        && request.resource.data.number.matches("^[0-9]{3}$");
+        && request.resource.data.number.matches("^[0-9]{3}$")
+        && request.resource.data.done == false;
       allow delete: if true;
-      allow update: if false;
+      allow update: if request.resource.data.number == resource.data.number
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.keys().hasOnly(["number", "createdAt", "done"])
+        && (
+          (request.resource.data.done == true
+            && (!resource.data.keys().hasAny(["done"]) || resource.data.done == false))
+          || (request.resource.data.done == false && resource.data.keys().hasAny(["done"]) && resource.data.done == true)
+        );
     }
 
     /**
-     * 管理端首页警告条（顾客端写入，管理员读取/关闭）
+     * duplicateBanner：重复提示；currentCall：当前叫号中的记录 id 与号码。
      */
     match /adminMeta/{docId} {
       allow read: if true;
@@ -25,6 +33,14 @@ service cloud.firestore {
         && (!("message" in request.resource.data)
           || (request.resource.data.message is string
             && request.resource.data.message.size() <= 500));
+      allow create, update: if docId == "currentCall"
+        && request.resource.data.keys().hasOnly(["activeLogId", "activeNumber"])
+        && (request.resource.data.activeLogId == null
+          || (request.resource.data.activeLogId is string
+            && request.resource.data.activeLogId.size() > 0))
+        && (request.resource.data.activeNumber == null
+          || (request.resource.data.activeNumber is string
+            && request.resource.data.activeNumber.matches("^[0-9]{3}$")));
     }
 
     match /{document=**} {
