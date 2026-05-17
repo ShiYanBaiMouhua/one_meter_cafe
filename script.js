@@ -13,6 +13,7 @@ const DUPLICATE_WARNING_TEXT = "有重复号码，请检查记录";
 const PROCEED_SOUND_URL = "sound/proceed.mp3";
 
 let lastPlaybackKey = null;
+let pendingAnnouncementNumber = null;
 
 function currentCallPlaybackKey(data) {
   if (
@@ -44,8 +45,13 @@ function playOneAudio(url) {
   });
 }
 
+function setSoundUnlockVisible(visible) {
+  if (!btnEnableSound) return;
+  btnEnableSound.hidden = !visible;
+}
+
 /** 号码音频两遍 + proceed.mp3 一遍 */
-async function playCallAnnouncementSequence(paddedNumberStr) {
+async function playCallAnnouncementSequence(paddedNumberStr, fromUserGesture = false) {
   const n = parseInt(String(paddedNumberStr), 10);
   if (
     !Number.isInteger(n) ||
@@ -59,9 +65,15 @@ async function playCallAnnouncementSequence(paddedNumberStr) {
     await playOneAudio(numberUrl);
     await playOneAudio(numberUrl);
     await playOneAudio(PROCEED_SOUND_URL);
+    pendingAnnouncementNumber = null;
+    setSoundUnlockVisible(false);
   } catch (err) {
+    pendingAnnouncementNumber = paddedNumberStr;
+    setSoundUnlockVisible(true);
     console.warn(
-      "叫号音频序列无法完整播放（请先轻触页面一次以解除浏览器限制）",
+      fromUserGesture
+        ? "叫号音频序列无法完整播放，请检查音频路径或浏览器设置"
+        : "叫号音频序列被浏览器拦截，请点击“启用叫号声音”",
       err
     );
   }
@@ -137,6 +149,7 @@ const ticketNumberInput = document.getElementById("ticket-number-input");
 const btnConfirm = document.getElementById("btn-confirm");
 const btnWaitBack = document.getElementById("btn-wait-back");
 const waitBackCountEl = document.getElementById("wait-back-count");
+const btnEnableSound = document.getElementById("btn-enable-sound");
 
 /** @type {string[]} */
 const digits = [];
@@ -279,6 +292,21 @@ if (ticketNumberInput) {
       if (!btnConfirm.disabled) {
         btnConfirm.click();
       }
+    }
+  });
+}
+
+if (btnEnableSound) {
+  btnEnableSound.addEventListener("click", async () => {
+    if (!pendingAnnouncementNumber) {
+      setSoundUnlockVisible(false);
+      return;
+    }
+    btnEnableSound.disabled = true;
+    try {
+      await playCallAnnouncementSequence(pendingAnnouncementNumber, true);
+    } finally {
+      btnEnableSound.disabled = false;
     }
   });
 }
