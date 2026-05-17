@@ -1,4 +1,5 @@
 const TZ = "Asia/Shanghai";
+const LOG_COLLECTION = "guestNumberLogs";
 
 const screenHome = document.getElementById("screen-admin-home");
 const screenList = document.getElementById("screen-admin-list");
@@ -6,10 +7,6 @@ const btnBrowse = document.getElementById("btn-browse-logs");
 const btnBack = document.getElementById("btn-admin-back");
 const listStatus = document.getElementById("admin-list-status");
 const logList = document.getElementById("admin-log-list");
-
-function functionsRegion() {
-  return window.FIREBASE_FUNCTIONS_REGION || "asia-east1";
-}
 
 function showHome() {
   screenList.hidden = true;
@@ -70,21 +67,49 @@ function renderItems(items) {
   }
 }
 
+function firestoreErrorHint(err) {
+  const code = err?.code || "";
+  if (code === "permission-denied") {
+    return "无读取权限：请在 Firebase 控制台部署最新的 Firestore 规则（guestNumberLogs 允许 read）。";
+  }
+  if (code === "failed-precondition") {
+    return "查询需要索引：请打开浏览器控制台里的 Firebase 链接一键创建索引后重试。";
+  }
+  if (code === "unavailable") {
+    return "网络不可用，请检查连接后重试。";
+  }
+  const msg = typeof err?.message === "string" ? err.message : "";
+  return msg ? `加载失败：${msg}` : "加载失败，请重试";
+}
+
 async function loadLogs() {
   listStatus.textContent = "加载中…";
   renderItems([]);
   try {
-    const fn = firebase
-      .app()
-      .functions(functionsRegion())
-      .httpsCallable("listGuestNumbers");
-    const res = await fn();
-    const items = Array.isArray(res.data?.items) ? res.data.items : [];
+    const db = firebase.firestore();
+    const snap = await db
+      .collection(LOG_COLLECTION)
+      .orderBy("createdAt", "desc")
+      .limit(500)
+      .get();
+
+    const items = snap.docs.map((d) => {
+      const data = d.data();
+      const ts = data.createdAt;
+      const createdAtMs =
+        ts && typeof ts.toMillis === "function" ? ts.toMillis() : null;
+      return {
+        id: d.id,
+        number: data.number,
+        createdAtMs,
+      };
+    });
+
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
     renderItems(items);
   } catch (err) {
     console.error(err);
-    listStatus.textContent = "加载失败，请重试";
+    listStatus.textContent = firestoreErrorHint(err);
     renderItems([]);
   }
 }

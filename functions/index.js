@@ -104,30 +104,3 @@ exports.recordGuestNumber = onCall(
   }
 );
 
-exports.listGuestNumbers = onCall(
-  {
-    region: "asia-east1",
-    timeoutSeconds: 30,
-    memory: "256MiB",
-    invoker: "public",
-    cors: true,
-  },
-  async () => {
-    const snap = await db
-      .collection(GUEST_NUMBER_LOGS)
-      .orderBy("createdAt", "desc")
-      .limit(500)
-      .get();
-    const items = snap.docs.map((d) => {
-      const data = d.data();
-      const ts = data.createdAt;
-      return {
-        id: d.id,
-        number: data.number,
-        createdAtMs:
-          ts && typeof ts.toMillis === "function" ? ts.toMillis() : null,
-      };
-    });
-    return { items };
-  }
-);
