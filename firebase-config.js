@@ -1,5 +1,5 @@
-/** Web app config from Firebase Console → Project settings → Your apps. */
-export const firebaseConfig = {
+/** Firebase Web 配置（控制台 → 项目设置 → 您的应用）。通过 `<script src>` 引入，勿提交密钥到公开仓库时请改用环境注入。 */
+window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyAzli5fep77FGNcuplx3dgSenOWwG4wKAc",
   authDomain: "meter-cafe.firebaseapp.com",
   projectId: "meter-cafe",
@@ -9,5 +9,5 @@ export const firebaseConfig = {
   measurementId: "G-W0S5FERQB6",
 };
 
-/** Must match the region where `assignDailyNumber` is deployed. */
-export const functionsRegion = "asia-east1";
+/** 须与 Cloud Functions 部署区域一致 */
+window.FIREBASE_FUNCTIONS_REGION = "asia-east1";

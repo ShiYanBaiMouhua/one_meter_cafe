@@ -1,6 +1,24 @@
 const TICKET_LEN = 3;
 const WAIT_RETURN_MS = 5000;
 
+function recordGuestNumberSilent(numberStr) {
+  if (typeof firebase === "undefined" || !firebase.apps?.length) {
+    return;
+  }
+  const region =
+    typeof window !== "undefined" && window.FIREBASE_FUNCTIONS_REGION
+      ? window.FIREBASE_FUNCTIONS_REGION
+      : "asia-east1";
+  try {
+    const fn = firebase.app().functions(region).httpsCallable("recordGuestNumber");
+    fn({ number: numberStr }).catch((err) => {
+      console.warn("recordGuestNumber failed", err);
+    });
+  } catch (err) {
+    console.warn("recordGuestNumber failed", err);
+  }
+}
+
 const screenTicket = document.getElementById("screen-ticket");
 const screenWait = document.getElementById("screen-wait");
 const ticketNumberEl = document.getElementById("ticket-number");
@@ -96,6 +114,8 @@ btnConfirm.addEventListener("click", () => {
   if (btnConfirm.disabled || !screenTicket || !screenWait) {
     return;
   }
+
+  recordGuestNumberSilent(digits.join(""));
 
   screenTicket.hidden = true;
   screenTicket.setAttribute("aria-hidden", "true");

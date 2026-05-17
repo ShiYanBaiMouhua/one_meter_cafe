@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hans">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -47,6 +47,12 @@
         </button>
       </section>
     </main>
+    <script src="firebase-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-functions-compat.js"></script>
+    <script>
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+    </script>
     <script src="script.js" defer></script>
   </body>
 </html>

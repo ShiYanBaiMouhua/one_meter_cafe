@@ -10,6 +10,8 @@ const SHOP_TIMEZONE = "Asia/Shanghai";
 const MIN_TICKET = 1;
 const MAX_TICKET = 300;
 const COLLECTION = "ticketDays";
+/** 顾客在前台确认的 3 位号码记录（与每日抽签 ticketDays 无关） */
+const GUEST_NUMBER_LOGS = "guestNumberLogs";
 
 function todayKeyInTimezone(timeZone) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -77,5 +79,55 @@ exports.assignDailyNumber = onCall(
       console.error("assignDailyNumber failed", err);
       throw new HttpsError("internal", "ASSIGN_FAILED");
     }
+  }
+);
+
+exports.recordGuestNumber = onCall(
+  {
+    region: "asia-east1",
+    timeoutSeconds: 15,
+    memory: "256MiB",
+    invoker: "public",
+    cors: true,
+  },
+  async (request) => {
+    const raw = request.data?.number;
+    const str = typeof raw === "string" ? raw.trim() : "";
+    if (!/^\d{3}$/.test(str)) {
+      throw new HttpsError("invalid-argument", "INVALID_NUMBER");
+    }
+    await db.collection(GUEST_NUMBER_LOGS).add({
+      number: str,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return { ok: true };
+  }
+);
+
+exports.listGuestNumbers = onCall(
+  {
+    region: "asia-east1",
+    timeoutSeconds: 30,
+    memory: "256MiB",
+    invoker: "public",
+    cors: true,
+  },
+  async () => {
+    const snap = await db
+      .collection(GUEST_NUMBER_LOGS)
+      .orderBy("createdAt", "desc")
+      .limit(500)
+      .get();
+    const items = snap.docs.map((d) => {
+      const data = d.data();
+      const ts = data.createdAt;
+      return {
+        id: d.id,
+        number: data.number,
+        createdAtMs:
+          ts && typeof ts.toMillis === "function" ? ts.toMillis() : null,
+      };
+    });
+    return { items };
   }
 );
