@@ -7,7 +7,76 @@ const MAX_GUEST_NUMBER = 162;
 const LOG_COLLECTION = "guestNumberLogs";
 const ADMIN_META = "adminMeta";
 const DUPLICATE_BANNER_ID = "duplicateBanner";
+const CURRENT_CALL_DOC = "currentCall";
 const DUPLICATE_WARNING_TEXT = "有重复号码，请检查记录";
+
+const PROCEED_SOUND_URL = "sound/proceed.mp3";
+
+let lastAnnouncedLogId = null;
+
+function playOneAudio(url) {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    const done = () => resolve();
+    audio.addEventListener("ended", done, { once: true });
+    audio.addEventListener(
+      "error",
+      () => reject(new Error(`音频加载失败: ${url}`)),
+      { once: true }
+    );
+    audio.play().catch(reject);
+  });
+}
+
+/** 号码音频两遍 + proceed.mp3 一遍 */
+async function playCallAnnouncementSequence(paddedNumberStr) {
+  const n = parseInt(String(paddedNumberStr), 10);
+  if (
+    !Number.isInteger(n) ||
+    n < MIN_GUEST_NUMBER ||
+    n > MAX_GUEST_NUMBER
+  ) {
+    return;
+  }
+  const numberUrl = `sound/${n}.mp3`;
+  try {
+    await playOneAudio(numberUrl);
+    await playOneAudio(numberUrl);
+    await playOneAudio(PROCEED_SOUND_URL);
+  } catch (err) {
+    console.warn(
+      "叫号音频序列无法完整播放（请先轻触页面一次以解除浏览器限制）",
+      err
+    );
+  }
+}
+
+function subscribeCurrentCallAnnouncements() {
+  if (typeof firebase === "undefined") return;
+  const db = firebase.firestore();
+  db.collection(ADMIN_META)
+    .doc(CURRENT_CALL_DOC)
+    .onSnapshot(
+      (snap) => {
+        if (!snap.exists) {
+          lastAnnouncedLogId = null;
+          return;
+        }
+        const data = snap.data();
+        const logId = data.activeLogId;
+        const num = data.activeNumber;
+        if (!logId || typeof num !== "string" || num.length === 0) {
+          lastAnnouncedLogId = null;
+          return;
+        }
+        if (logId === lastAnnouncedLogId) return;
+        lastAnnouncedLogId = logId;
+        playCallAnnouncementSequence(num);
+      },
+      (err) => console.error("currentCall 叫号监听失败", err)
+    );
+}
 
 function recordGuestNumberSilent(numberStr) {
   if (typeof firebase === "undefined") return;
@@ -201,3 +270,4 @@ if (ticketNumberInput) {
 }
 
 render();
+subscribeCurrentCallAnnouncements();
