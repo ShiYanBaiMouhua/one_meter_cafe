@@ -13,11 +13,6 @@ const DUPLICATE_WARNING_TEXT = "有重复号码，请检查记录";
 const PROCEED_SOUND_URL = "sound/proceed.mp3";
 
 let lastPlaybackKey = null;
-let pendingAnnouncementNumber = null;
-/** 是否已在用户手势内向本页解锁过 Audio（部分浏览器允许后续自动播放） */
-let guestAudioPrimed = false;
-/** 监听中：待处理的自动重试（避免重复绑定） */
-let pendingRetryCleanup = null;
 
 function currentCallPlaybackKey(data) {
   if (
@@ -49,72 +44,8 @@ function playOneAudio(url) {
   });
 }
 
-/**
- * 在用户点击/触摸等手势内短播几乎静音片段，尽量解锁后续程序化播放（无可见 UI）。
- */
-async function tryPrimeGuestAudioFromGesture() {
-  if (guestAudioPrimed) return true;
-  const audio = new Audio(PROCEED_SOUND_URL);
-  audio.preload = "auto";
-  audio.volume = 0.02;
-  try {
-    await audio.play();
-    audio.pause();
-    audio.currentTime = 0;
-    guestAudioPrimed = true;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function clearPendingRetryListeners() {
-  if (typeof pendingRetryCleanup === "function") {
-    pendingRetryCleanup();
-    pendingRetryCleanup = null;
-  }
-}
-
-function scheduleAnnouncementRetryOnNextInteraction() {
-  clearPendingRetryListeners();
-  let fired = false;
-  const onInteract = () => {
-    if (fired) return;
-    fired = true;
-    clearPendingRetryListeners();
-    if (!pendingAnnouncementNumber) return;
-    const n = pendingAnnouncementNumber;
-    void playCallAnnouncementSequence(n, true);
-  };
-  document.addEventListener("pointerdown", onInteract, {
-    capture: true,
-    passive: true,
-  });
-  document.addEventListener("touchstart", onInteract, {
-    capture: true,
-    passive: true,
-  });
-  pendingRetryCleanup = () => {
-    document.removeEventListener("pointerdown", onInteract, true);
-    document.removeEventListener("touchstart", onInteract, true);
-  };
-}
-
-["pointerdown", "touchstart"].forEach((type) => {
-  document.addEventListener(
-    type,
-    () => {
-      void tryPrimeGuestAudioFromGesture();
-    },
-    { capture: true, passive: true }
-  );
-});
-
-/** 号码音频两遍 + proceed.mp3 一遍 */
-async function playCallAnnouncementSequence(
-  paddedNumberStr,
-  fromUserGesture = false
-) {
+/** 号码音频两遍 + proceed.mp3 一遍（收到叫号即尝试播放，无额外 UI） */
+async function playCallAnnouncementSequence(paddedNumberStr) {
   const n = parseInt(String(paddedNumberStr), 10);
   if (
     !Number.isInteger(n) ||
@@ -128,17 +59,8 @@ async function playCallAnnouncementSequence(
     await playOneAudio(numberUrl);
     await playOneAudio(numberUrl);
     await playOneAudio(PROCEED_SOUND_URL);
-    pendingAnnouncementNumber = null;
-    clearPendingRetryListeners();
   } catch (err) {
-    pendingAnnouncementNumber = paddedNumberStr;
-    scheduleAnnouncementRetryOnNextInteraction();
-    console.warn(
-      fromUserGesture
-        ? "叫号音频无法完整播放，请检查文件路径或浏览器设置"
-        : "叫号音频本机尚未解锁或暂时无法播放，轻触屏幕任意处将重试",
-      err
-    );
+    console.warn("叫号音频未能自动播放（多为浏览器限制未与用户交互）", err);
   }
 }
 
