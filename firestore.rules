@@ -2,10 +2,17 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    /** 管理页直接读列表；写入仅允许服务端（Cloud Functions Admin SDK） */
+    /**
+     * 顾客前台：浏览器创建一条记录（号码 + 服务端时间戳）。
+     * 管理页：读取列表。
+     * 禁止修改/删除历史记录（客户端）。
+     */
     match /guestNumberLogs/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow create: if request.resource.data.keys().hasOnly(["number", "createdAt"])
+        && request.resource.data.number is string
+        && request.resource.data.number.matches("^[0-9]{3}$");
+      allow update, delete: if false;
     }
 
     match /{document=**} {

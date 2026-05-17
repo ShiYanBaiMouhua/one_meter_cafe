@@ -2,20 +2,19 @@ const TICKET_LEN = 3;
 const WAIT_RETURN_MS = 5000;
 
 function recordGuestNumberSilent(numberStr) {
-  if (typeof firebase === "undefined" || !firebase.apps?.length) {
-    return;
-  }
-  const region =
-    typeof window !== "undefined" && window.FIREBASE_FUNCTIONS_REGION
-      ? window.FIREBASE_FUNCTIONS_REGION
-      : "asia-east1";
+  if (typeof firebase === "undefined") return;
   try {
-    const fn = firebase.app().functions(region).httpsCallable("recordGuestNumber");
-    fn({ number: numberStr }).catch((err) => {
-      console.warn("recordGuestNumber failed", err);
-    });
+    const db = firebase.firestore();
+    db.collection("guestNumberLogs")
+      .add({
+        number: numberStr,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      })
+      .catch((err) => {
+        console.warn("guestNumberLogs write failed", err);
+      });
   } catch (err) {
-    console.warn("recordGuestNumber failed", err);
+    console.warn("guestNumberLogs write failed", err);
   }
 }
 
