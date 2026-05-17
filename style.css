@@ -83,6 +83,13 @@ body {
   max-width: min(22rem, 92vw);
 }
 
+.ticket-number-wrap {
+  position: relative;
+  display: inline-block;
+  width: min(96vw, 24rem);
+  min-height: clamp(4.5rem, 28vw, min(44vw, 48vh));
+}
+
 .ticket-number {
   margin: 0;
   font-family: "DIN Next LT Pro", ui-monospace, monospace;
@@ -94,6 +101,28 @@ body {
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
+  outline: none;
+  pointer-events: none;
+}
+
+/* 覆盖在数字区域上，点击/聚焦可唤起手机、平板数字键盘（需配合 inputmode） */
+.ticket-number-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: text;
+  z-index: 1;
+  font-size: 16px; /* 避免 iOS 聚焦时整页缩放 */
+  caret-color: transparent;
+}
+
+.ticket-number-input:focus {
   outline: none;
 }
 

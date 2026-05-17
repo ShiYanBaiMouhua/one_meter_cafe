@@ -50,6 +50,7 @@ function recordGuestNumberSilent(numberStr) {
 const screenTicket = document.getElementById("screen-ticket");
 const screenWait = document.getElementById("screen-wait");
 const ticketNumberEl = document.getElementById("ticket-number");
+const ticketNumberInput = document.getElementById("ticket-number-input");
 const btnConfirm = document.getElementById("btn-confirm");
 const btnWaitBack = document.getElementById("btn-wait-back");
 const waitBackCountEl = document.getElementById("wait-back-count");
@@ -77,6 +78,9 @@ function render() {
     parts.push(i < digits.length ? digits[i] : "_");
   }
   ticketNumberEl.textContent = parts.join(" ");
+  if (ticketNumberInput) {
+    ticketNumberInput.value = digits.join("");
+  }
   btnConfirm.disabled = !isGuestNumberInRange();
 }
 
@@ -107,7 +111,9 @@ function returnToTicketScreen() {
   screenWait.setAttribute("aria-hidden", "true");
   screenTicket.hidden = false;
   screenTicket.removeAttribute("aria-hidden");
-  ticketNumberEl.focus();
+  if (ticketNumberInput) {
+    ticketNumberInput.focus();
+  }
 }
 
 function startWaitCountdownAndAutoReturn() {
@@ -132,6 +138,9 @@ function removeLastDigit() {
 
 window.addEventListener("keydown", (e) => {
   if (screenTicket.hidden) return;
+  if (ticketNumberInput && e.target === ticketNumberInput) {
+    return;
+  }
 
   if (/^[0-9]$/.test(e.key)) {
     e.preventDefault();
@@ -169,5 +178,26 @@ btnWaitBack.addEventListener("click", () => {
   returnToTicketScreen();
 });
 
+if (ticketNumberInput) {
+  ticketNumberInput.addEventListener("input", () => {
+    if (screenTicket.hidden) return;
+    const raw = ticketNumberInput.value.replace(/\D/g, "").slice(0, TICKET_LEN);
+    digits.length = 0;
+    for (const ch of raw) {
+      digits.push(ch);
+    }
+    render();
+  });
+
+  ticketNumberInput.addEventListener("keydown", (e) => {
+    if (screenTicket.hidden) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!btnConfirm.disabled) {
+        btnConfirm.click();
+      }
+    }
+  });
+}
+
 render();
-ticketNumberEl.focus();

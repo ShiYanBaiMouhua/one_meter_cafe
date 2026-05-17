@@ -18,14 +18,30 @@
         aria-label="Your number"
       >
         <p class="result-label result-label-top">Your number is:</p>
-        <p
-          id="ticket-number"
-          class="ticket-number"
-          aria-live="polite"
-          tabindex="0"
-        >
-          _ _ _
-        </p>
+        <div class="ticket-number-wrap">
+          <p
+            id="ticket-number"
+            class="ticket-number"
+            aria-hidden="true"
+          >
+            _ _ _
+          </p>
+          <input
+            id="ticket-number-input"
+            class="ticket-number-input"
+            type="text"
+            name="ticketDigits"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="3"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="done"
+            aria-label="输入三位号码"
+          />
+        </div>
         <button type="button" id="btn-confirm" class="btn-primary" disabled>
           Confirm
         </button>
@@ -53,6 +69,6 @@
     <script>
       firebase.initializeApp(window.FIREBASE_CONFIG);
     </script>
-    <script src="script.js?v=8" defer></script>
+    <script src="script.js?v=11" defer></script>
   </body>
 </html>
