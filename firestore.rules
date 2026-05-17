@@ -15,6 +15,18 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    /**
+     * 管理端首页警告条（顾客端写入，管理员读取/关闭）
+     */
+    match /adminMeta/{docId} {
+      allow read: if true;
+      allow create, update: if docId == "duplicateBanner"
+        && request.resource.data.visible is bool
+        && (!("message" in request.resource.data)
+          || (request.resource.data.message is string
+            && request.resource.data.message.size() <= 500));
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

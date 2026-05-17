@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#590f2d" />
     <title>管理 · 号数记录</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="admin.css?v=2" />
+    <link rel="stylesheet" href="admin.css?v=5" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -22,6 +22,26 @@
           <header class="admin-header">
             <h1 class="admin-title">后台</h1>
             <p class="admin-subtitle">点击下方按钮查看顾客确认的号码</p>
+            <p
+              id="admin-home-login-status"
+              class="admin-home-login-status"
+              aria-live="polite"
+            ></p>
+            <div
+              id="admin-duplicate-warning"
+              class="admin-duplicate-warning"
+              role="alert"
+              hidden
+            >
+              <p id="admin-duplicate-warning-text" class="admin-duplicate-warning-text"></p>
+              <button
+                type="button"
+                id="btn-dismiss-duplicate-warning"
+                class="admin-dismiss-warning"
+              >
+                知道了
+              </button>
+            </div>
           </header>
           <div class="admin-home-actions">
             <button type="button" id="btn-browse-logs" class="btn-primary admin-btn-wide">
@@ -44,6 +64,15 @@
             <h2 class="admin-list-title">号数记录</h2>
           </header>
           <p id="admin-list-status" class="admin-list-status" aria-live="polite"></p>
+          <div class="admin-list-toolbar">
+            <button
+              type="button"
+              id="btn-clear-all-logs"
+              class="admin-btn-clear-all"
+            >
+              清除所有记录
+            </button>
+          </div>
           <ul id="admin-log-list" class="admin-log-list"></ul>
         </section>
       </main>
@@ -55,6 +84,6 @@
     <script>
       firebase.initializeApp(window.FIREBASE_CONFIG);
     </script>
-    <script src="admin.js?v=2" defer></script>
+    <script src="admin.js?v=5" defer></script>
   </body>
 </html>

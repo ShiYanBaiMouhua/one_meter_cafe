@@ -53,6 +53,56 @@
   margin-inline: auto;
 }
 
+.admin-home-login-status {
+  margin: 0.85rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #590f2d;
+}
+
+.admin-duplicate-warning {
+  margin: 0.75rem auto 0;
+  max-width: 20rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(176, 40, 40, 0.1);
+  border: 1px solid rgba(176, 40, 40, 0.32);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.admin-duplicate-warning[hidden] {
+  display: none !important;
+}
+
+.admin-duplicate-warning-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #7a1414;
+  text-align: left;
+}
+
+.admin-dismiss-warning {
+  align-self: flex-end;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(176, 40, 40, 0.45);
+  background: #ffffff;
+  color: #7a1414;
+  cursor: pointer;
+  min-height: 38px;
+}
+
+.admin-dismiss-warning:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
 .admin-home-actions {
   display: flex;
   justify-content: center;
@@ -95,6 +145,34 @@
   font-size: 0.88rem;
   color: rgba(89, 15, 45, 0.65);
   min-height: 1.25rem;
+}
+
+.admin-list-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -0.25rem;
+}
+
+.admin-btn-clear-all {
+  font-family: inherit;
+  font-size: 0.88rem;
+  letter-spacing: -0.02em;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(176, 40, 40, 0.45);
+  background: rgba(176, 40, 40, 0.08);
+  color: #8f1111;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.admin-btn-clear-all:hover:not(:disabled) {
+  background: rgba(176, 40, 40, 0.14);
+}
+
+.admin-btn-clear-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .admin-log-list {

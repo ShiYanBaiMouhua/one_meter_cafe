@@ -1,5 +1,10 @@
 const TZ = "Asia/Shanghai";
 const LOG_COLLECTION = "guestNumberLogs";
+const ADMIN_META_COLLECTION = "adminMeta";
+const DUPLICATE_BANNER_DOC = "duplicateBanner";
+const DUPLICATE_WARNING_DEFAULT = "有重复号码，请检查记录";
+/** 与前台可输入范围上限一致（script.js MAX_GUEST_NUMBER） */
+const GUEST_CAPACITY = 162;
 
 const screenHome = document.getElementById("screen-admin-home");
 const screenList = document.getElementById("screen-admin-list");
@@ -7,12 +12,119 @@ const btnBrowse = document.getElementById("btn-browse-logs");
 const btnBack = document.getElementById("btn-admin-back");
 const listStatus = document.getElementById("admin-list-status");
 const logList = document.getElementById("admin-log-list");
+const homeLoginStatus = document.getElementById("admin-home-login-status");
+const btnClearAll = document.getElementById("btn-clear-all-logs");
+const duplicateWarning = document.getElementById("admin-duplicate-warning");
+const duplicateWarningText = document.getElementById(
+  "admin-duplicate-warning-text"
+);
+const btnDismissDuplicate = document.getElementById(
+  "btn-dismiss-duplicate-warning"
+);
 
 function showHome() {
   screenList.hidden = true;
   screenList.setAttribute("aria-hidden", "true");
   screenHome.hidden = false;
   screenHome.removeAttribute("aria-hidden");
+  void refreshHomeLoginStatus();
+}
+
+async function fetchLogCount() {
+  const db = firebase.firestore();
+  const coll = db.collection(LOG_COLLECTION);
+  try {
+    const aggSnap = await coll.count().get();
+    return aggSnap.data().count;
+  } catch (err) {
+    console.warn("count() 不可用，回退为全量计数", err);
+    const snap = await coll.get();
+    return snap.size;
+  }
+}
+
+async function refreshHomeLoginStatus() {
+  if (!homeLoginStatus) return;
+  homeLoginStatus.textContent = "加载中…";
+  try {
+    const n = await fetchLogCount();
+    homeLoginStatus.textContent = `已登入${n}/${GUEST_CAPACITY}`;
+  } catch (err) {
+    console.error(err);
+    homeLoginStatus.textContent = `已登入—/${GUEST_CAPACITY}`;
+  }
+}
+
+function updateDuplicateBannerUI(data) {
+  if (!duplicateWarning || !duplicateWarningText) return;
+  const visible = data?.visible === true;
+  duplicateWarning.hidden = !visible;
+  duplicateWarning.setAttribute("aria-hidden", visible ? "false" : "true");
+  duplicateWarningText.textContent = visible
+    ? typeof data?.message === "string" && data.message.trim()
+      ? data.message.trim()
+      : DUPLICATE_WARNING_DEFAULT
+    : "";
+}
+
+function subscribeDuplicateBanner() {
+  if (typeof firebase === "undefined") return;
+  const db = firebase.firestore();
+  db.collection(ADMIN_META_COLLECTION)
+    .doc(DUPLICATE_BANNER_DOC)
+    .onSnapshot(
+      (snap) => {
+        updateDuplicateBannerUI(
+          snap.exists ? snap.data() : { visible: false }
+        );
+      },
+      (err) => console.error("duplicateBanner listen failed", err)
+    );
+}
+
+if (btnDismissDuplicate) {
+  btnDismissDuplicate.addEventListener("click", () => {
+    if (typeof firebase === "undefined") return;
+    const db = firebase.firestore();
+    db.collection(ADMIN_META_COLLECTION)
+      .doc(DUPLICATE_BANNER_DOC)
+      .set({ visible: false }, { merge: true })
+      .catch((err) => console.error(err));
+  });
+}
+
+function setClearAllEnabled(itemCount, loading) {
+  if (!btnClearAll) return;
+  btnClearAll.disabled = Boolean(loading) || itemCount === 0;
+}
+
+/** 按文档 ID 分页删除整表（每批最多 500 条 write） */
+async function deleteAllGuestLogs() {
+  const db = firebase.firestore();
+  const coll = db.collection(LOG_COLLECTION);
+  const docIdPath = firebase.firestore.FieldPath.documentId();
+  const pageSize = 500;
+  let lastDoc = null;
+
+  for (;;) {
+    let q = coll.orderBy(docIdPath).limit(pageSize);
+    if (lastDoc) {
+      q = q.startAfter(lastDoc);
+    }
+    const snap = await q.get();
+    if (snap.empty) {
+      break;
+    }
+    const batch = db.batch();
+    for (const d of snap.docs) {
+      batch.delete(d.ref);
+    }
+    await batch.commit();
+    lastDoc = snap.docs[snap.docs.length - 1];
+    if (snap.size < pageSize) {
+      break;
+    }
+  }
 }
 
 function showList() {
@@ -125,7 +237,9 @@ async function deleteLogDoc(docId, buttonEl) {
     await db.collection(LOG_COLLECTION).doc(docId).delete();
     const items = await fetchLogItems();
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
+    setClearAllEnabled(items.length, false);
     renderItems(items, deleteLogDoc);
+    void refreshHomeLoginStatus();
   } catch (err) {
     console.error(err);
     listStatus.textContent = firestoreErrorHint(err);
@@ -136,16 +250,52 @@ async function deleteLogDoc(docId, buttonEl) {
 
 async function loadLogs() {
   listStatus.textContent = "加载中…";
+  setClearAllEnabled(0, true);
   renderItems([], deleteLogDoc);
   try {
     const items = await fetchLogItems();
     listStatus.textContent = `共 ${items.length} 条（最多显示 500 条）`;
+    setClearAllEnabled(items.length, false);
     renderItems(items, deleteLogDoc);
+    void refreshHomeLoginStatus();
   } catch (err) {
     console.error(err);
     listStatus.textContent = firestoreErrorHint(err);
+    setClearAllEnabled(0, false);
     renderItems([], deleteLogDoc);
   }
+}
+
+if (btnClearAll) {
+  btnClearAll.addEventListener("click", async () => {
+    if (btnClearAll.disabled) return;
+    const ok = window.confirm("确定删除全部记录？此操作不可恢复。");
+    if (!ok) return;
+
+    const prevLabel = btnClearAll.textContent;
+    btnClearAll.disabled = true;
+    if (btnBack) btnBack.disabled = true;
+    listStatus.textContent = "正在清除全部记录…";
+    try {
+      await deleteAllGuestLogs();
+      await firebase
+        .firestore()
+        .collection(ADMIN_META_COLLECTION)
+        .doc(DUPLICATE_BANNER_DOC)
+        .set({ visible: false }, { merge: true });
+      listStatus.textContent = "共 0 条（最多显示 500 条）";
+      setClearAllEnabled(0, false);
+      renderItems([], deleteLogDoc);
+      void refreshHomeLoginStatus();
+    } catch (err) {
+      console.error(err);
+      listStatus.textContent = firestoreErrorHint(err);
+      await loadLogs();
+    } finally {
+      btnClearAll.textContent = prevLabel;
+      if (btnBack) btnBack.disabled = false;
+    }
+  });
 }
 
 btnBrowse.addEventListener("click", async () => {
@@ -156,3 +306,6 @@ btnBrowse.addEventListener("click", async () => {
 btnBack.addEventListener("click", () => {
   showHome();
 });
+
+void refreshHomeLoginStatus();
+subscribeDuplicateBanner();

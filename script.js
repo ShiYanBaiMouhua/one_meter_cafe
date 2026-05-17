@@ -1,21 +1,45 @@
 const TICKET_LEN = 3;
 const WAIT_RETURN_MS = 5000;
+/** 顾客输入号码须在 001–162（含）之间，Confirm 才可点 */
+const MIN_GUEST_NUMBER = 1;
+const MAX_GUEST_NUMBER = 162;
+
+const LOG_COLLECTION = "guestNumberLogs";
+const ADMIN_META = "adminMeta";
+const DUPLICATE_BANNER_ID = "duplicateBanner";
+const DUPLICATE_WARNING_TEXT = "有重复号码，请检查记录";
 
 function recordGuestNumberSilent(numberStr) {
   if (typeof firebase === "undefined") return;
-  try {
-    const db = firebase.firestore();
-    db.collection("guestNumberLogs")
-      .add({
+  const db = firebase.firestore();
+  const logs = db.collection(LOG_COLLECTION);
+
+  logs
+    .where("number", "==", numberStr)
+    .limit(1)
+    .get()
+    .then((prior) => {
+      return logs.add({
         number: numberStr,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      })
-      .catch((err) => {
-        console.warn("guestNumberLogs write failed", err);
+      }).then(() => {
+        if (!prior.empty) {
+          return db
+            .collection(ADMIN_META)
+            .doc(DUPLICATE_BANNER_ID)
+            .set(
+              {
+                visible: true,
+                message: DUPLICATE_WARNING_TEXT,
+              },
+              { merge: true }
+            );
+        }
       });
-  } catch (err) {
-    console.warn("guestNumberLogs write failed", err);
-  }
+    })
+    .catch((err) => {
+      console.warn("guestNumberLogs / duplicate check failed", err);
+    });
 }
 
 const screenTicket = document.getElementById("screen-ticket");
@@ -32,13 +56,23 @@ let returnToTicketTimerId = null;
 let waitCountdownIntervalId = null;
 let waitEndsAt = 0;
 
+function isGuestNumberInRange() {
+  if (digits.length !== TICKET_LEN) return false;
+  const n = parseInt(digits.join(""), 10);
+  return (
+    Number.isInteger(n) &&
+    n >= MIN_GUEST_NUMBER &&
+    n <= MAX_GUEST_NUMBER
+  );
+}
+
 function render() {
   const parts = [];
   for (let i = 0; i < TICKET_LEN; i++) {
     parts.push(i < digits.length ? digits[i] : "_");
   }
   ticketNumberEl.textContent = parts.join(" ");
-  btnConfirm.disabled = digits.length !== TICKET_LEN;
+  btnConfirm.disabled = !isGuestNumberInRange();
 }
 
 function clearWaitTimers() {
@@ -113,6 +147,7 @@ btnConfirm.addEventListener("click", () => {
   if (btnConfirm.disabled || !screenTicket || !screenWait) {
     return;
   }
+  if (!isGuestNumberInRange()) return;
 
   recordGuestNumberSilent(digits.join(""));
 
