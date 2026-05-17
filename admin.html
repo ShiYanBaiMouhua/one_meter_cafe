@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#590f2d" />
     <title>管理 · 号数记录</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="admin.css?v=11" />
+    <link rel="stylesheet" href="admin.css?v=12" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -76,6 +76,13 @@
             <button type="button" id="btn-browse-logs" class="btn-primary admin-btn-wide">
               浏览号数记录
             </button>
+            <button
+              type="button"
+              id="btn-admin-test-call-sound"
+              class="admin-btn-test-call-sound"
+            >
+              测试叫号音效（本机）
+            </button>
           </div>
         </section>
 
@@ -113,6 +120,6 @@
     <script>
       firebase.initializeApp(window.FIREBASE_CONFIG);
     </script>
-    <script src="admin.js?v=11" defer></script>
+    <script src="admin.js?v=12" defer></script>
   </body>
 </html>

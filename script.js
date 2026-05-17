@@ -14,6 +14,10 @@ const PROCEED_SOUND_URL = "sound/proceed.mp3";
 
 let lastPlaybackKey = null;
 let pendingAnnouncementNumber = null;
+/** 是否已在用户手势内向本页解锁过 Audio（部分浏览器允许后续自动播放） */
+let guestAudioPrimed = false;
+/** 监听中：待处理的自动重试（避免重复绑定） */
+let pendingRetryCleanup = null;
 
 function currentCallPlaybackKey(data) {
   if (
@@ -45,13 +49,72 @@ function playOneAudio(url) {
   });
 }
 
-function setSoundUnlockVisible(visible) {
-  if (!btnEnableSound) return;
-  btnEnableSound.hidden = !visible;
+/**
+ * 在用户点击/触摸等手势内短播几乎静音片段，尽量解锁后续程序化播放（无可见 UI）。
+ */
+async function tryPrimeGuestAudioFromGesture() {
+  if (guestAudioPrimed) return true;
+  const audio = new Audio(PROCEED_SOUND_URL);
+  audio.preload = "auto";
+  audio.volume = 0.02;
+  try {
+    await audio.play();
+    audio.pause();
+    audio.currentTime = 0;
+    guestAudioPrimed = true;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
+function clearPendingRetryListeners() {
+  if (typeof pendingRetryCleanup === "function") {
+    pendingRetryCleanup();
+    pendingRetryCleanup = null;
+  }
+}
+
+function scheduleAnnouncementRetryOnNextInteraction() {
+  clearPendingRetryListeners();
+  let fired = false;
+  const onInteract = () => {
+    if (fired) return;
+    fired = true;
+    clearPendingRetryListeners();
+    if (!pendingAnnouncementNumber) return;
+    const n = pendingAnnouncementNumber;
+    void playCallAnnouncementSequence(n, true);
+  };
+  document.addEventListener("pointerdown", onInteract, {
+    capture: true,
+    passive: true,
+  });
+  document.addEventListener("touchstart", onInteract, {
+    capture: true,
+    passive: true,
+  });
+  pendingRetryCleanup = () => {
+    document.removeEventListener("pointerdown", onInteract, true);
+    document.removeEventListener("touchstart", onInteract, true);
+  };
+}
+
+["pointerdown", "touchstart"].forEach((type) => {
+  document.addEventListener(
+    type,
+    () => {
+      void tryPrimeGuestAudioFromGesture();
+    },
+    { capture: true, passive: true }
+  );
+});
+
 /** 号码音频两遍 + proceed.mp3 一遍 */
-async function playCallAnnouncementSequence(paddedNumberStr, fromUserGesture = false) {
+async function playCallAnnouncementSequence(
+  paddedNumberStr,
+  fromUserGesture = false
+) {
   const n = parseInt(String(paddedNumberStr), 10);
   if (
     !Number.isInteger(n) ||
@@ -66,14 +129,14 @@ async function playCallAnnouncementSequence(paddedNumberStr, fromUserGesture = f
     await playOneAudio(numberUrl);
     await playOneAudio(PROCEED_SOUND_URL);
     pendingAnnouncementNumber = null;
-    setSoundUnlockVisible(false);
+    clearPendingRetryListeners();
   } catch (err) {
     pendingAnnouncementNumber = paddedNumberStr;
-    setSoundUnlockVisible(true);
+    scheduleAnnouncementRetryOnNextInteraction();
     console.warn(
       fromUserGesture
-        ? "叫号音频序列无法完整播放，请检查音频路径或浏览器设置"
-        : "叫号音频序列被浏览器拦截，请点击“启用叫号声音”",
+        ? "叫号音频无法完整播放，请检查文件路径或浏览器设置"
+        : "叫号音频本机尚未解锁或暂时无法播放，轻触屏幕任意处将重试",
       err
     );
   }
@@ -149,7 +212,6 @@ const ticketNumberInput = document.getElementById("ticket-number-input");
 const btnConfirm = document.getElementById("btn-confirm");
 const btnWaitBack = document.getElementById("btn-wait-back");
 const waitBackCountEl = document.getElementById("wait-back-count");
-const btnEnableSound = document.getElementById("btn-enable-sound");
 
 /** @type {string[]} */
 const digits = [];
@@ -292,21 +354,6 @@ if (ticketNumberInput) {
       if (!btnConfirm.disabled) {
         btnConfirm.click();
       }
-    }
-  });
-}
-
-if (btnEnableSound) {
-  btnEnableSound.addEventListener("click", async () => {
-    if (!pendingAnnouncementNumber) {
-      setSoundUnlockVisible(false);
-      return;
-    }
-    btnEnableSound.disabled = true;
-    try {
-      await playCallAnnouncementSequence(pendingAnnouncementNumber, true);
-    } finally {
-      btnEnableSound.disabled = false;
     }
   });
 }

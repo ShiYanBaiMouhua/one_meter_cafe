@@ -4,6 +4,9 @@ const ADMIN_META_COLLECTION = "adminMeta";
 const DUPLICATE_BANNER_DOC = "duplicateBanner";
 const CURRENT_CALL_DOC = "currentCall";
 const DUPLICATE_WARNING_DEFAULT = "有重复号码，请检查记录";
+/** 与顾客端试听一致：001 号音频 ×2 + proceed（仅本机预览，不影响前台） */
+const ADMIN_TEST_CALL_PADDED = "001";
+const ADMIN_PROCEED_SOUND = "sound/proceed.mp3";
 /** 与前台可输入范围上限一致（script.js MAX_GUEST_NUMBER） */
 const GUEST_CAPACITY = 162;
 
@@ -28,6 +31,9 @@ const duplicateWarningText = document.getElementById(
 );
 const btnDismissDuplicate = document.getElementById(
   "btn-dismiss-duplicate-warning"
+);
+const btnAdminTestCallSound = document.getElementById(
+  "btn-admin-test-call-sound"
 );
 
 /** 首页统计：日志快照 + currentCall 快照 */
@@ -199,6 +205,30 @@ async function replayCurrentCallAnnouncement() {
     },
     { merge: true }
   );
+}
+
+function playOneAudioAdmin(url) {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    const done = () => resolve();
+    audio.addEventListener("ended", done, { once: true });
+    audio.addEventListener(
+      "error",
+      () => reject(new Error(`音频加载失败: ${url}`)),
+      { once: true }
+    );
+    audio.play().catch(reject);
+  });
+}
+
+/** 与顾客端叫号序列一致，仅本机试听（不写入 Firestore） */
+async function adminPlayTestCallSoundSequence() {
+  const n = parseInt(ADMIN_TEST_CALL_PADDED, 10);
+  const numberUrl = `sound/${n}.mp3`;
+  await playOneAudioAdmin(numberUrl);
+  await playOneAudioAdmin(numberUrl);
+  await playOneAudioAdmin(ADMIN_PROCEED_SOUND);
 }
 
 function updateDuplicateBannerUI(data) {
@@ -535,6 +565,23 @@ if (btnReplayAnnouncement) {
       window.alert("再次呼叫失败，请检查网络与 Firestore 规则是否已部署。");
     } finally {
       btnReplayAnnouncement.disabled = false;
+    }
+  });
+}
+
+if (btnAdminTestCallSound) {
+  btnAdminTestCallSound.addEventListener("click", async () => {
+    if (btnAdminTestCallSound.disabled) return;
+    btnAdminTestCallSound.disabled = true;
+    try {
+      await adminPlayTestCallSoundSequence();
+    } catch (e) {
+      console.error(e);
+      window.alert(
+        "播放失败：请确认 sound 资源可访问，或在浏览器中允许本站播放声音后重试。"
+      );
+    } finally {
+      btnAdminTestCallSound.disabled = false;
     }
   });
 }

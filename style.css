@@ -74,7 +74,7 @@ body {
   margin: 0;
   font-size: clamp(0.85rem, 3.5vw, 1.05rem);
   line-height: 1.45;
-  max-width: 22rem;
+  max-width: min(36rem, 94vw);
   padding-inline: 0.5rem;
   letter-spacing: -0.04em;
 }
@@ -83,7 +83,7 @@ body {
   max-width: min(22rem, 92vw);
 }
 
-/* 仅作透明输入层定位用，不限制整页/号码区的宽窄比例（避免看起来像窄屏手机栏） */
+/* 仅作透明输入层定位用；号码尺寸用 vmin，横竖屏比例一致，避免纯 vw 在宽屏上过扁或过大 */
 .ticket-number-wrap {
   position: relative;
   display: block;
@@ -95,7 +95,7 @@ body {
 .ticket-number {
   margin: 0;
   font-family: "DIN Next LT Pro", ui-monospace, monospace;
-  font-size: clamp(4rem, 32vw, min(42vw, 52vh));
+  font-size: clamp(3.5rem, 22vmin, 12rem);
   line-height: 0.95;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -168,36 +168,3 @@ body {
   color: rgba(89, 15, 45, 0.45);
 }
 
-.sound-unlock-btn {
-  position: fixed;
-  left: 50%;
-  bottom: max(1rem, env(safe-area-inset-bottom));
-  z-index: 10;
-  transform: translateX(-50%);
-  font-family: inherit;
-  font-size: 0.95rem;
-  letter-spacing: -0.03em;
-  padding: 0.8rem 1.2rem;
-  min-height: 48px;
-  border: none;
-  border-radius: 999px;
-  background: #590f2d;
-  color: #ffffff;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(89, 15, 45, 0.22);
-}
-
-.sound-unlock-btn[hidden] {
-  display: none !important;
-}
-
-.sound-unlock-btn:disabled {
-  opacity: 0.65;
-  cursor: wait;
-}
-
-@media (orientation: landscape) and (max-height: 500px) {
-  .ticket-number {
-    font-size: min(48vh, 70vw);
-  }
-}
